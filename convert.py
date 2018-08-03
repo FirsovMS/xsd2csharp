@@ -24,7 +24,8 @@ class Generator:
         base = input("Enter base namespace: (example and default :'{}'): ".format(self.namespace));
         if base: self.namespace = base;
         # add namespace folder based on current folder name
-        self.namespace += "." + os.getcwd().split("\\")[-1].split('.')[0];
+        self.path_out = os.getcwd().split("\\")[-1].split('.')[0];
+        self.namespace += "." + self.path_out;
 
     def run(self):
         self.print_dialog();
@@ -80,7 +81,7 @@ class Generator:
 # run app
 if __name__ == "__main__":
     if not os.name == "nt":
-        print ("Sorry, on linux not available ;(");
+        print ("Sorry, only Windows ;(");
     else:
         gen = Generator();
         gen.run();
