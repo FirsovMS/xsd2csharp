@@ -46,7 +46,7 @@ class Generator:
             out_dir = self.is_existed_dir(f);
             namespace = self.namespace if not isFork(f.strip()[:-4]) else self.namespace + "." + out_dir.split('/')[-1];
             out_fname = f[:-4] + ".cs";            
-            cmd = "Xsd2Code {} {} {} -o -platform Net35".format(f, namespace, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
+            cmd = "Xsd2Code {} {} {} -o -platform Net35 /xa+ /if-".format(f, namespace, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
             try:
                 code = subprocess.call(cmd, creationflags=CREATE_NO_WINDOW);
                 # move to folder
