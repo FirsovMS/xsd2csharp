@@ -10,6 +10,7 @@ class Generator:
         self.path_out = "./out";
         self.modes = ["Xsd2Code", "wsdl"];
         self.mode = 0;
+        self.namespace = "TravelSkyDLL.Lib.XML";
         self.files = [];
 
     def print_dialog(self):
@@ -20,6 +21,10 @@ class Generator:
         m = int(m) if m else 0;
         self.mode = m if m >= 0 and m < len(self.modes) else 0;
         print("Choosed mode: {}".format(self.modes[self.mode]));
+        base = input("Enter base namespace: (example and default :'{}'): ".format(self.namespace));
+        if base: self.namespace = base;
+        # add namespace folder based on current folder name
+        self.namespace += "." + os.getcwd().split("\\")[-1].split('.')[0];
 
     def run(self):
         self.print_dialog();
@@ -35,11 +40,12 @@ class Generator:
         # create base out dir
         if not os.path.exists(self.path_out): os.makedirs(self.path_out);
         # run method
-        fmt_cmd = "Xsd2Code {} -o {} -platform Net35" if self.mode == 0 else "xsd {} -classes" ;
+        isFork = lambda fd : fd.endswith("RQ") or fd.endswith("RS");
         for f in self.files:
             out_dir = self.is_existed_dir(f);
-            out_fname = f[:-4] + ".cs";
-            cmd = "Xsd2Code {} -o {} -platform Net35".format(f, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
+            namespace = self.namespace if not isFork(f.strip()[:-4]) else self.namespace + "." + out_dir.split('/')[-1];
+            out_fname = f[:-4] + ".cs";            
+            cmd = "Xsd2Code {} {} {} -o -platform Net35".format(f, namespace, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
             try:
                 code = subprocess.call(cmd, creationflags=CREATE_NO_WINDOW);
                 # move to folder
@@ -52,7 +58,7 @@ class Generator:
             ind +=1;
 
     def rm_dir(self):
-        if os.path.isdir(self.path_out): shutil.rmtree(self.path_out);        
+        if os.path.isdir(self.path_out): shutil.rmtree(self.path_out);
 
     def is_existed_dir(self, file):
         file = file.strip()[:-4];
