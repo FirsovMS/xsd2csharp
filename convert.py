@@ -8,10 +8,23 @@ class Generator:
     def __init__(self):
         self.path_in = ".";
         self.path_out = "./out";
+        self.modes = ["Xsd2Code", "wsdl"];
+        self.mode = 0;
         self.files = [];
 
+    def print_dialog(self):
+        print("Modes available:");
+        for k in range(len(self.modes)):
+            print(k,".",self.modes[k]);
+        m = input("Pick mode number! (defalut {}): ".format(self.mode));
+        m = int(m) if m else 0;
+        self.mode = m if m >= 0 and m < len(self.modes) else 0;
+        print("Choosed mode: {}".format(self.modes[self.mode]));
+
     def run(self):
+        self.print_dialog();
         self.check_xsd_available();
+        # fill files list
         for file in os.listdir(self.path_in):
             if file.endswith(".xsd"): self.files.append(file);
         length = len(self.files);
@@ -19,19 +32,21 @@ class Generator:
         self.rm_dir();
         ind = 1;
         CREATE_NO_WINDOW = 0x08000000;
+        # create base out dir
+        if not os.path.exists(self.path_out): os.makedirs(self.path_out);
+        # run method
+        fmt_cmd = "Xsd2Code {} -o {} -platform Net35" if self.mode == 0 else "xsd {} -classes" ;
         for f in self.files:
             out_dir = self.is_existed_dir(f);
             out_fname = f[:-4] + ".cs";
-##            cmd = "xsd " + self.path_in + "\\" + f + " -classes -outputdir:" + out_dir;
-##            print(cmd);
-            cmd = "Xsd2Code " + f + " -o " + out_fname;
+            cmd = "Xsd2Code {} -o {} -platform Net35".format(f, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
             try:
                 code = subprocess.call(cmd, creationflags=CREATE_NO_WINDOW);
+                # move to folder
+                if code == 0: os.rename("./" + out_fname, out_dir + "/" + out_fname);
             except OSError:
                 print ("Error: popen");
             code = "OK" if code == 0 else "Bad";
-            # move to folder
-            if code == "OK": os.rename("./" + out_fname, out_dir + "/" + out_fname); 
             # print message
             print("Proceded :[{} in {}] => filename: {}; Status: {}".format(ind, length, f, code));
             ind +=1;
@@ -41,21 +56,26 @@ class Generator:
 
     def is_existed_dir(self, file):
         file = file.strip()[:-4];
-        newpath = self.path_out + "/";
-        newpath += file[:-2] if file.endswith("RQ") or file.endswith("RS") else file; 
-        if not os.path.exists(newpath):
-            os.makedirs(newpath)
-        return newpath;
+        if file.endswith("RQ") or file.endswith("RS"):
+            newpath = self.path_out + "/";
+            newpath += file[:-2] if file.endswith("RQ") or file.endswith("RS") else file;
+            if not os.path.exists(newpath): os.makedirs(newpath);
+            return newpath;
+        return self.path_out;
 
     def check_xsd_available(self):
         try:
-            if os.popen("where xsd").read() == '':
+            if not os.popen("where " + self.modes[self.mode]).read():
                 raise FileNotFoundError;
         except FileNotFoundError:
-            print("Error: Specify xsd.exe as Path variable!");
-            exit(-1);        
+            print("Error: Specify {} as Path variable!".format(self.modes[self.mode]));
+            exit(-1);
 
-gen = Generator();
-gen.run();
-
-
+# run app
+if __name__ == "__main__":
+    if not os.name == "nt":
+        print ("Sorry, on linux not available ;(");
+    else:
+        gen = Generator();
+        gen.run();
+        print("Done!");
