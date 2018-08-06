@@ -8,12 +8,12 @@ class Generator:
     def __init__(self):
         self.path_in = ".";
         # path_out folder has name as base folder
-        self.path_out = os.getcwd().split("\\")[-1].split('.')[0];
-        self.modes = ["Xsd2Code", "wsdl"];
-        self.mode = 0;
+        split_char = "\\" if os.name == "nt" else "/";
+        self.path_out = os.getcwd().split(split_char)[-1].split('.')[0] 
+        self.cmd = "Xsd2Code {} {} {} -o /pl Net35 /xa+ /if-";
         self.namespace = "TravelSkyDLL.Lib.XML";
-        self.files = [];
-        self.file_tree = {};
+        self.files = list();
+        self.file_tree = list();
 
     def get_path_out(self):
         return self.path_out;
@@ -22,81 +22,79 @@ class Generator:
         return self.file_tree;    
 
     def print_dialog(self):
-        print("Modes available:");
-        for k in range(len(self.modes)):
-            print(k,".",self.modes[k]);
-        m = input("Pick mode number! (defalut {}): ".format(self.mode));
-        m = int(m) if m else 0;
-        self.mode = m if m >= 0 and m < len(self.modes) else 0;
-        print("Choosed mode: {}".format(self.modes[self.mode]));
         base = input("Enter base namespace: (example and default :'{}'): ".format(self.namespace));
         if base: self.namespace = base;
-        # add namespace folder based on current folder name
-        self.namespace += "." + self.path_out;
+        print("Choosed cmd: {}".format(self.cmd.format("'<file>'", self.namespace, "'<output_name>'")));
 
-    ## return True, if files count > 0 
     def get_files(self):
-        # fill files list
+        print("Log: Get files to procede");
         for file in os.listdir(self.path_in):
             if file.endswith(".xsd"): self.files.append(file);
-        return len(self.files);
-
-    # create output file tree map struct
-    def gen_file_tree_out(self):
-        for f in self.files:
-            out_fname = f[:-4] + ".cs";
-            self.file_tree[out_fname] = self.is_existed_dir(f) + "/" + out_fname;            
-
-    # TODO: сделать обработку по stage
-
-    # TODO: г
-
-    def run(self):
-        self.print_dialog();
-        self.check_xsd_available();
-        # check files in dir
-        if not self.get_files():
+        if  len(self.files) == 0:
             print("Files not exists in dir:{}!".format(self.path_in));
             exit(-1);
-        # create output fir file tree
-        self.gen_file_tree_out();
-        # remove last output
-        self.rm_dir();
-        ind = 1;
-        CREATE_NO_WINDOW = 0x08000000;
-        # create base out dir
-        if not os.path.exists(self.path_out): os.makedirs(self.path_out);
-        # run method
+        print("File Count : {}".format(len(self.files)));
+        self.files.sort();
+
+    def gen_file_tree_out(self):
+        print("Log: Get file tree list");
         isFork = lambda fd : fd.endswith("RQ") or fd.endswith("RS");
-        for f in self.files:
-            out_dir = self.is_existed_dir(f);
-            namespace = self.namespace if not isFork(f.strip()[:-4]) else self.namespace + "." + out_dir.split('/')[-1];
-            out_fname = f[:-4] + ".cs";            
-            cmd = "Xsd2Code {} {} {} -o /pl Net35 /xa+ /if-".format(f, namespace, out_fname) if self.mode == 0 else "xsd {} -classes".format(f);
+        files = [val[:-4] for val in self.files];
+        for fname in files:
+            # find rq & rs pair
+            if isFork(fname):
+                fname = fname[:-2];
+                # add as pair
+                pair_index = [i for i,s in enumerate(files) if s.find(fname) != -1];
+                if len(pair_index) == 2:
+                    # append pair to tree
+                    [self.file_tree.append(("{}/{}".format(self.path_out, fname), "{}.cs".format(files[i]))) for i in pair_index];
+                    # remove latest files list
+                    files.pop(max(pair_index));
+                    continue;
+            # add to common file[fname]
+            self.file_tree.append(("{}".format(self.path_out), "{}.cs".format(fname)));
+
+    def create_tree_dir(self):
+        print("Log: Create otput file tree");
+        # remove last output & create new
+        if os.path.isdir(self.path_out):
+            shutil.rmtree(self.path_out);
+            if os.path.exists(self.path_out):
+                os.makedirs(self.path_out);
+        # create dir tree
+        for path in self.file_tree:
+            if not os.path.exists(path[0]): os.makedirs(path[0]);
+
+    # TODO: сделать обработку по stage
+    def run(self):
+        # Check avability
+        #self.check_xsd_available();
+        # Print dialog
+        self.print_dialog();
+        # Get files and check 
+        self.get_files();
+        # get output file tree
+        self.gen_file_tree_out();
+        # create directories
+        self.create_tree_dir();
+        # process files
+        l = len(self.files);
+        for i in range(l):
             try:
-                # code = subprocess.call(cmd, creationflags=CREATE_NO_WINDOW);
-                # move to folder
-                dest_path = out_dir + "/" + out_fname;
-                self.fout_tree.append(dest_path);
-                #if code == 0: os.rename("./" + out_fname, dest_path);
-            except OSError:
-                print ("Error: popen");
-            #code = "OK" if code == 0 else "Bad";
-            # print message
-            #print("Proceded :[{} in {}] => filename: {}; Status: {}".format(ind, length, f, code));
-            ind +=1;
+                self.process_one(self.files[i], self.file_tree[i], i);
+                print("Proceded :[{} in {}] => filename: {}; Status: OK".format(i, l, self.files[i]));
+            except Exception as err:
+                print("Error : " + err)
+                exit(-1);                
 
-    def rm_dir(self):
-        if os.path.isdir(self.path_out): shutil.rmtree(self.path_out);
-
-    def is_existed_dir(self, file):
-        file = file.strip()[:-4];
-        if file.endswith("RQ") or file.endswith("RS"):
-            newpath = self.path_out + "/";
-            newpath += file[:-2] if file.endswith("RQ") or file.endswith("RS") else file;
-            if not os.path.exists(newpath): os.makedirs(newpath);
-            return newpath;
-        return self.path_out;
+    # processing files on cmd util
+    def process_one(self, src, dest_pair):
+        code = subprocess.call(self.cmd.format(src, self.namespace + "." + dest_pair[0].replace('/', '.'), dest_pair[1]), creationflags=0x08000000); # CREATE_NO_WINDOW
+        if code == 0:
+            os.rename(dest_pair[1], "{}/{}".format(dest_pair[0], dest_pair[1]));
+        else:
+            raise Exception("process code != 0");     
 
     def check_xsd_available(self):
         try:
@@ -118,12 +116,12 @@ class Analyze:
 
 # run app
 if __name__ == "__main__":
-    if not os.name == "nt":
+    if os.name == "nt":
         print ("Sorry, only Windows ;(");
     else:
         gen = Generator();
         gen.run();
         # run duplicate analyze
-        analyze = Analyze(gen.get_path_out(), gen.get_file_tree());
-        analyze.run();
+        #analyze = Analyze(gen.get_path_out(), gen.get_file_tree());
+        #analyze.run();
         print("Done!");
