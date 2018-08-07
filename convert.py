@@ -32,14 +32,6 @@ class Parser:
                     if st.find('}') != -1:
                         open_braces -= 1;
                 end = i;
-                # find attributes
-##                back_ind = start - 1;
-##                while( True ):
-##                    if is_atttribute( content[back_ind] ):
-##                        back_ind -= 1;
-##                        continue;
-##                    break;
-##                start = start if back_ind == start - 1 else back_ind + 1;
                 # add to map
                 if is_common_file:
                     #print ("Class was found at {0}-{1}: name: {class_name}".format( start, end, class_name = match.groups()[0]))
@@ -65,8 +57,8 @@ class Parser:
 
 # Analyze and remove duplicate classes in file
 class Analyze:
-    def __init__(self, file_tree):
-        self.common_filename = "CommonTypes.cs";
+    def __init__(self, file_tree, head_node):
+        self.common_filename = head_node;
         ##  [(filename, path)...]
         self.file_tree = file_tree;
         self.parser = Parser();
@@ -75,14 +67,17 @@ class Analyze:
     def run(self):
         print("Log: run analyze");
         try:
-            path = ["{0}/{1}".format(pair[0], pair[1]) for pair in self.file_tree if pair[1] == self.common_filename];
-            path = str(path[0]);
+            pair = [(i, pair) for i, pair in enumerate(self.file_tree) if pair[1] == self.common_filename]
+            ind = int(pair[0][0]);
+            path = "{0}/{1}".format(pair[0][1][0], pair[0][1][1]);
             # process common file
             self.process_file(self.common_filename, path)
+            # remove recent
+            self.file_tree.pop(ind);
             # process others
             for pair in self.file_tree:
-                    path = "{0}/{1}".format(pair[0], pair[1]);
-                    self.process_file(pair[1], path);            
+                path = "{0}/{1}".format(pair[0], pair[1]);
+                self.process_file(pair[1], path);            
         except Exception as e:
             raise e;
             print("Error : {0}".format(e.args[0]));
@@ -152,7 +147,7 @@ class Generator:
         self.namespace = "TravelSkyDLL.Lib.XML";
         self.files = list();
         self.file_tree = list(); # pair { path, filename }  path + "/" + filename = full path
-        self.analyzer = Analyze(self.file_tree);
+##        self.analyzer = Analyze(self.file_tree, "CommonTypes.cs");                                                  #!!!
 
     @property
     def get_path_out(self):
@@ -222,6 +217,8 @@ class Generator:
         self.get_files();
         # get output file tree
         self.gen_file_tree_out();
+        print(self.file_tree)
+        exit(0)
         # check folder
         if  self.is_tree_dir_exists():
             over_dial = input("Folder with three structure exists, overwrite? (y/n)? : default: 'n' ");
@@ -230,7 +227,12 @@ class Generator:
         else:
             self.process_all();
         #TODO: Analyze files
-        self.analyzer.run();
+##        self.analyzer.run();
+        analyzer = Analyze(self.file_tree, "CommonTypes.cs");
+        analyzer.run()
+        for pair in self.file_tree:
+            analyzer = Analyze(self.file_tree, pair[1]);
+            analyzer.run()
 
     def process_all(self):
         # create directories
@@ -242,7 +244,7 @@ class Generator:
                 self.process_one(self.files[i], self.file_tree[i]);
                 print("Proceded :[{} in {}] => filename: {}; Status: OK".format(i, l, self.files[i]));
             except Exception as e:
-                print("Error : {0}".format(e.args[0]));
+                print("Error : Can't generate files! Code: {0}".format(e.args[0]));
                 exit(-1);
 
     # processing files on cmd util
